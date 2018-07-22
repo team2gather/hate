@@ -1,21 +1,67 @@
 [%bs.raw {|require('./App.css')|}];
 
-[@bs.module] external logo : string = "./logo.svg";
+let firebase = [%bs.raw {|require('firebase/app')|}];
+[%bs.raw {|require('firebase/firestore')|}]
 
-let component = ReasonReact.statelessComponent("App");
+let config = [%bs.raw {|require('./firebase-config.json')|}];
+[%bs.raw {|firebase.initializeApp(config)|}];
 
-let make = (~message, _children) => {
+let firestore = [%bs.raw {|firebase.firestore()|}];
+[%bs.raw {|firestore.settings({timestampsInSnapshots: true})|}]
+ 
+type route =
+  | RouteHome
+  | RouteMap(string, string)
+;
+
+type state = {route};
+
+type action =
+  | ChangeRoute(route)
+;
+
+let reducer = (action, _state) =>
+  switch action {
+  | ChangeRoute(route) => ReasonReact.Update({route: route})
+  };
+
+let mapHashToRoute = (hash: string) => {
+  let params = Js.String.split("/", hash);
+  switch (params) {
+    | [|"", mapId, markerId|] => RouteMap(mapId, markerId)
+    | _ => RouteHome
+  }
+} 
+
+let mapUrlToRoute = (url: ReasonReact.Router.url) => {
+  switch url.path {
+  | [] => mapHashToRoute(url.hash)
+  | _ => RouteHome
+  };
+}
+
+let component = ReasonReact.reducerComponent("App");
+
+let make = (_children) => {
   ...component,
-  render: _self =>
-    <div className="App">
-      <div className="App-header">
-        <img src=logo className="App-logo" alt="logo" />
-        <h2> (ReasonReact.string(message)) </h2>
-      </div>
-      <p className="App-intro">
-        (ReasonReact.string("To get started, edit"))
-        <code> (ReasonReact.string(" src/App.re ")) </code>
-        (ReasonReact.string("and save to reload."))
-      </p>
-    </div>,
+  reducer,
+  initialState: () => {
+    route: ReasonReact.Router.dangerouslyGetInitialUrl() |> mapUrlToRoute
+  },
+  subscriptions: self => [
+    Sub(
+      () =>
+        ReasonReact.Router.watchUrl(url => {
+          self.send(ChangeRoute(url |> mapUrlToRoute))
+        }),
+      ReasonReact.Router.unwatchUrl,
+    ),
+  ],
+  render: self =>
+    switch (self.state.route) {
+      | RouteMap(mapId, markerId) => {
+        <Map mapId markerId db=firestore/>
+      }
+      | RouteHome => <Home/>
+    }
 };
