@@ -1,15 +1,13 @@
 [%bs.raw {|require('./App.css')|}];
 
-let firebase = [%bs.raw {|require('firebase/app')|}];
-[%bs.raw {|require('firebase/firestore')|}]
-
 let config = [%bs.raw {|require('./firebase-config.json')|}];
-[%bs.raw {|firebase.initializeApp(config)|}];
+let firebase = Firebase.initializeApp(config);
+let firestore = Firebase.firestore(firebase); 
+Firestore.settings(firestore, [%bs.obj {
+  timestampsInSnapshots: true
+}]);
 
-let firestore = [%bs.raw {|firebase.firestore()|}];
-[%bs.raw {|firestore.settings({timestampsInSnapshots: true})|}]
- 
-type route =
+type route = 
   | RouteHome
   | RouteMap(string, string)
 ;
@@ -57,11 +55,13 @@ let make = (_children) => {
       ReasonReact.Router.unwatchUrl,
     ),
   ],
-  render: self =>
+  render: self => {
     switch (self.state.route) {
       | RouteMap(mapId, markerId) => {
         <Map mapId markerId db=firestore/>
       }
       | RouteHome => <Home/>
     }
+  }
 };
+
