@@ -1,5 +1,7 @@
 ## Project Setup
 
+In general, everything should just work when running `yarn run start` and using `localhost:3000` to view the project during development. However, for pre-production staging, follow along with the below guide to setup nginx
+
 ### Linking Packages
 
 Some of the dependencies in this project have yet to be published and as such require usage of `yarn link` to properly setup for development. They are as follows:
@@ -70,7 +72,7 @@ server {
     server_name  team2gather.local-github.xxx;
 
     location /hate {
-        root   /Users/conformity/Projects/biz/team2gather/hate;
+        alias   /Users/conformity/Projects/biz/team2gather/hate/build;
         index  index.html index.htm;
     }
 }
