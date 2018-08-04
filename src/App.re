@@ -32,6 +32,7 @@ let mapHashToRoute = (hash: string) => {
 } 
 
 let mapUrlToRoute = (url: ReasonReact.Router.url) => {
+  Js.log2("url", url);
   switch url.path {
   | [] => mapHashToRoute(url.hash)
   | _ => RouteHome
