@@ -1,3 +1,119 @@
+## Project Setup
+
+### Linking Packages
+
+Some of the dependencies in this project have yet to be published and as such require usage of `yarn link` to properly setup for development. They are as follows:
+
+- [bs-firestore](https://github.com/team2gather/bs-firestore)
+
+For all the above, clone those repos down into your local projects folder, then run the following:
+
+```zsh
+yarn install
+yarn link
+```
+
+Then come back into this directory and run the following:
+
+```zsh
+yarn link bs-firestore # Replace `bs-firestore` with whatever other package you JUST linked
+yarn
+```
+
+Then run `yarn run build` if it builds, then everything works!
+
+### Setting Up Nginx
+
+We use `nginx` as the reverse proxy to emulate github pages. Setup nginx like so:
+
+```zsh
+brew install nginx
+cd /usr/local/etc/nginx
+```
+
+Once installed, go inside your installed `nginx` directory and edit the `nginx.conf` file so that you can add servers:
+
+```zsh
+sudo vim nginx.conf
+```
+
+Toward the bottom of the file, you'll see something like:
+
+```
+    #        root   html;
+    #        index  index.html index.htm;
+    #    }
+    #}
+    include servers/*;
+}
+```
+
+Right below the `include servers/*` line, add the following:
+
+```
+include [PATH-TO-YOUR-LOCAL-PROJECTS-DIRECTORY];
+```
+
+On my mac, this looks like:
+
+```
+include servers/*;
+include /Users/conformity/Projects/servers/*.nginx.conf;
+```
+
+For serving this particular project, I hate the following file at
+`/Users/conformity/Projects/servers/team2gather.nginx.conf`
+
+```
+server {
+    listen       80;
+    server_name  team2gather.local-github.xxx;
+
+    location /hate {
+        root   /Users/conformity/Projects/biz/team2gather/hate;
+        index  index.html index.htm;
+    }
+}
+```
+
+*note* When you make changes to your nginx configurations, be sure to run:
+
+```zsh
+sudo nginx -s reload
+```
+To reload the configurations. Alternatively, if you've just restarted your machine or your nginx demon is turned off for some reason, be sure to turn it on with:
+
+```zsh
+sudo nginx
+```
+
+### Configre your Etsy Hostss
+
+You'll notice that my nginx conf states I have a `server_name` of `local-github.xxx`. But if you type that address into your address bar, you'll get nowhere! What's going on?
+
+The trick is you have to configure your `/etc/hosts` file to let your computer know that it shouldn't look to the public DNS for the IP address of your hostname. Edit your host file like so:
+
+```
+sudo vim /etc/hosts
+```
+
+Then edit that file so that it looks something like:
+
+```
+##
+# Host Database
+#
+# localhost is used to configure the loopback interface
+# when the system is booting.  Do not change this entry.
+##
+127.0.0.1	localhost
+255.255.255.255	broadcasthost
+::1             localhost
+127.0.0.1       local-github.xxx
+```
+
+In particular, the last line `127.0.0.1       local-github.xxx` indicates that the url `local-github.xxx` points to your home address!
+
 This project was bootstrapped with [Create React App](https://github.com/facebookincubator/create-react-app).
 
 Below you will find some information on how to perform common tasks.<br>

@@ -1,3 +1,5 @@
+open BsFirestore;
+
 [%bs.raw {|require('./App.css')|}];
 
 let config = [%bs.raw {|require('./firebase-config.json')|}];
