@@ -1,65 +1,181 @@
+[@bs.val][@bs.scope ("document")] external getElementById : string => Dom.element = "";
+[@bs.val][@bs.scope ("geolocation")] external clearWatch : int => unit = "";
+[@bs.val][@bs.scope ("navigator", "geolocation")] external watchPosition : ('a, 'b) => int = "";
+
+type markerData = {
+    slackId: string,
+    slackName: string,
+    slackImageUrl: string,
+    slackColor: string,
+    coordinates: (float, float),
+    status: string
+};
+
 type state = {
     map: ref(option(GoogleMap.t)),
-    meetupLocation: ref(string),
-    meetupTime: ref(string),
-    meetupDescription: ref(string)
+    markers: ref(Js.Dict.t(GoogleMap.Marker.t)),
+    meetupMarker: ref(GoogleMap.Marker.t),
+
+    meetupLocation: string,
+    meetupLocationCoordinates: (float, float),
+    meetupTime: string,
+    meetupDescription: string
 };
- 
+
 type action = 
-| SetMap(GoogleMap.t)
-| FetchMapData
-| UpdateMap(state)
+| CreateMap
+| UpdateMapInfo(state)
+| UpdateMapMarkers(array(markerData))
 ;
 
 let component = ReasonReact.reducerComponent("Map");
+
+let mapInfoListener = (self, mapId, db) => {
+    Firestore.collection(db, "maps")
+    |. Firestore.doc(mapId)
+    |. Firestore.DocumentReference.onSnapshot((snapshot) => {
+    let data = Firestore.DocumentSnapshot.data(snapshot);
+        self.ReasonReact.send(UpdateMapInfo({
+            ...self.ReasonReact.state,
+            meetupLocation: data##location,
+            meetupLocationCoordinates: (data##locationCoordinates##lat, data##locationCoordinates##lng),
+            meetupTime: data##time,
+            meetupDescription: data##description
+        }));
+    }, (error) => {
+        Js.log(error);
+    });
+};
+
+let mapMarkersListener = (self, mapId, markerId, db) => {
+    Firestore.collection(db, "maps")
+    |. Firestore.doc(mapId)
+    |. Firestore.collection("attendees")
+    |. Firestore.CollectionReference.onSnapshot((snapshot) => {
+      let docs = Firestore.QuerySnapshot.docs(snapshot);
+      let data = Array.map((doc) => {
+        let docData = Firestore.DocumentSnapshot.data(doc);
+        let marker = {
+            slackId: docData##id,
+            slackName: docData##name,
+            slackImageUrl: docData##imageUrl,
+            slackColor: docData##color,
+            coordinates: (docData##coordinates##latitude, docData##coordinates##longitude),
+            status: docData##status
+        };
+        marker;
+      }, docs);
+      self.ReasonReact.send(UpdateMapMarkers(data));
+    }, (error) => {
+      Js.log(error);
+    });
+};
+
+let adjustMapBounds = (map, meetupMarker, peopleMarkers) => {
+    let bounds = GoogleMap.LatLngBounds.instance();
+    GoogleMap.LatLngBounds.extend(bounds, GoogleMap.Marker.getPosition(meetupMarker));
+    Array.map(data => {
+        GoogleMap.LatLngBounds.extend(bounds, GoogleMap.Marker.getPosition(data));
+    }, Js.Dict.values(peopleMarkers)); 
+    GoogleMap.fitBounds(map, bounds);
+    GoogleMap.panToBounds(map, bounds);
+}
 
 let make = (~mapId, ~markerId, ~db, _children) => {
     ...component,
     initialState: () => {
         map: ref(None),
-        meetupLocation: ref(""),
-        meetupTime: ref(""),
-        meetupDescription: ref("")
+        markers: ref(Js.Dict.empty()),
+        meetupMarker: ref(GoogleMap.Marker.instance({
+            "label": "_MEET_"
+        })),
+        meetupLocation: "",
+        meetupLocationCoordinates: (0.0, 0.0),
+        meetupTime: "",
+        meetupDescription: ""
     },
     didMount: self => {
-        let map = GoogleMap.init(mapId, markerId, db);
-        self.send(SetMap(map));
-        self.send(FetchMapData);
+        self.send(CreateMap);
+
+        /* GEOLOCATION LISTENER */
+        let unregisterWatchPosition = watchPosition(pos => {
+            Firestore.collection(db, "maps")
+            |. Firestore.doc(mapId)
+            |. Firestore.collection("attendees")
+            |. Firestore.doc(markerId)
+            |. Firestore.DocumentReference.update({
+                "coordinates": Firebase.GeoPoint.instance(pos##coords##latitude, pos##coords##longitude)
+            }); 
+        }, err => {
+            Js.log(err);
+        });
+
+        /* DB LISTENERS */
+        let mapInfoUnsubscribe = mapInfoListener(self, mapId, db);
+        let mapMarkersUnsubscribe = mapMarkersListener(self, mapId, markerId, db);
+        
+        self.onUnmount(() => {
+            clearWatch(unregisterWatchPosition);
+            mapInfoUnsubscribe();
+            mapMarkersUnsubscribe();
+        });
     },
     reducer: (action, state) =>
         switch(action) {
-            | SetMap(map) => {
-                    state.map := Some(map);
-                    ReasonReact.NoUpdate;
-                }
-            | FetchMapData => {
-                    ReasonReact.SideEffects(self => {
-                        Firestore.collection(db, "maps")
-                        |. Firestore.CollectionReference.doc(mapId)
-                        |. Firestore.DocumentReference.get
-                        |> Js.Promise.then_(value => {
-                            let data = Firestore.DocumentSnapshot.data(value);
-                            self.send(UpdateMap({...self.state,
-                                meetupLocation: ref(data##location),
-                                meetupTime: ref(data##time),
-                                meetupDescription: ref(data##description)
-                            }));  
-                            Js.Promise.resolve(); 
-                        })
-                        |> ignore
-                    });
-                }
-            | UpdateMap(newState) => {
-                ReasonReact.Update(newState);
+            | CreateMap => {
+                state.map := Some(GoogleMap.instance(getElementById("map")));
+                ReasonReact.NoUpdate;
             }
+            | UpdateMapInfo(newState) => {
+                ReasonReact.UpdateWithSideEffects(newState, self => {
+                    switch self.state.map^ {
+                        | Some(map) => {
+                            GoogleMap.Marker.setOptions(self.state.meetupMarker^, {
+                                "position" : GoogleMap.LatLng.instance(fst(self.state.meetupLocationCoordinates), snd(self.state.meetupLocationCoordinates)),
+                                "map" : self.state.map^,
+                            });
+                            adjustMapBounds(map, self.state.meetupMarker^, self.state.markers^);
+                        }
+                        | None => ();
+                    };
+                });
+            }
+            | UpdateMapMarkers(data) => {
+                ReasonReact.SideEffects(self => {
+                    Array.iter((mData) => {
+                        let value = Js.Dict.get(self.state.markers^, mData.slackId);
+                        switch value {
+                            | Some(marker) => {
+                                GoogleMap.Marker.setOptions(marker, {
+                                    "position" : GoogleMap.LatLng.instance(fst(mData.coordinates), snd(mData.coordinates)),
+                                });
+                            }
+                            | None => {
+                                Js.Dict.set(self.state.markers^, mData.slackId, GoogleMap.Marker.instance({
+                                    "label": mData.slackName,
+                                    "position" : GoogleMap.LatLng.instance(fst(mData.coordinates), snd(mData.coordinates)),
+                                    "map" : self.state.map^
+                                }));
+                            }
+                        };
+                        switch self.state.map^ {
+                            | Some(map) => {
+                                adjustMapBounds(map, self.state.meetupMarker^, self.state.markers^);
+                            }
+                            | None => ();
+                        };
+                    }, data);
+                    
+                });
+            }
+        
     },
     render: self => {
-        Js.log(self.state);
         <div>
-            <p>{ReasonReact.string(self.state.meetupLocation^)}</p>
-            <p>{ReasonReact.string(self.state.meetupTime^)} </p>
+            <p>{ReasonReact.string(self.state.meetupLocation)}</p>
+            <p>{ReasonReact.string(self.state.meetupTime)} </p>
             <div id="map"/>
-            <p>{ReasonReact.string(self.state.meetupDescription^)}</p>
+            <p>{ReasonReact.string(self.state.meetupDescription)}</p>
         </div> 
     }
 };
