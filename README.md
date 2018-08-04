@@ -24,6 +24,30 @@ yarn
 
 Then run `yarn run build` if it builds, then everything works!
 
+### Setting SSL
+
+To mirror production staging should be done with HTTPS as well, so better load up the certs! (read the full guide [here](https://www.nginx.com/blog/nginx-https-101-ssl-basics-getting-started/#HowdoIgetaCertificate)). TL;DR, we will need the following
+
+* Generate a key-pair
+* Generate a sign request
+* Sign it ourselves
+
+```zsh
+openssl genrsa -des3 -passout pass:x -out server.pass.key 2048
+openssl rsa -passin pass:x -in server.pass.key -out server.key
+rm server.pass.key
+openssl req -new -key server.key -out server.csr
+```
+
+This creates your `key.csr` certificate signing request. Next, we'll need to sign this certificate ourselves, the full guide is from [heroku](https://devcenter.heroku.com/articles/ssl-certificate-self). Self sign with the following:
+
+```zsh
+openssl x509 -req -sha256 -days 365 -in server.csr -signkey server.key -out server.crt
+```
+
+Purely for your convenience, I've committed the development use version of these certs into the public directory, use them *ONLY* for development!
+
+
 ### Setting Up Nginx
 
 We use `nginx` as the reverse proxy to emulate github pages. Setup nginx like so:
@@ -68,8 +92,12 @@ For serving this particular project, I hate the following file at
 
 ```
 server {
-    listen       80;
+    listen       443 ssl;
     server_name  team2gather.local-github.xxx;
+
+    ssl_certificate /Users/conformity/Projects/biz/team2gather/hate/public/development.crt;
+    ssl_certificate_key /Users/conformity/Projects/biz/team2gather/hate/public/development.key;
+    ssl_session_timeout 1d;
 
     location /hate {
         alias   /Users/conformity/Projects/biz/team2gather/hate/build;
@@ -120,6 +148,18 @@ This project was bootstrapped with [Create React App](https://github.com/faceboo
 
 Below you will find some information on how to perform common tasks.<br>
 You can find the most recent version of this guide [here](https://github.com/facebookincubator/create-react-app/blob/master/packages/react-scripts/template/README.md).
+
+### Opening Chrome With Unsafe Service Workers
+
+So you've managed to successfully setup all the above and ran `yarn run build` to a completed build, it's time to finally test.
+
+Open up your chrome with the following command line (to tell chrome to ignore SSL certificate errros):
+
+```zsh
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --user-data-dir=/tmp/foo --ignore-certificate-errors --unsafely-treat-insecure-origin-as-secure=https://team2gather.local-github.xxx
+```
+
+See the full guide about disabling chrome [security here](https://deanhume.com/testing-service-workers-locally-with-self-signed-certificates/), then visit https://team2gather.local-github.xxx/hate
 
 ## Table of Contents
 
