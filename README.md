@@ -1,7 +1,165 @@
+## Project Setup
+
+In general, everything should just work when running `yarn run start` and using `localhost:3000` to view the project during development. However, for pre-production staging, follow along with the below guide to setup nginx
+
+### Linking Packages
+
+Some of the dependencies in this project have yet to be published and as such require usage of `yarn link` to properly setup for development. They are as follows:
+
+- [bs-firestore](https://github.com/team2gather/bs-firestore)
+
+For all the above, clone those repos down into your local projects folder, then run the following:
+
+```zsh
+yarn install
+yarn link
+```
+
+Then come back into this directory and run the following:
+
+```zsh
+yarn link bs-firestore # Replace `bs-firestore` with whatever other package you JUST linked
+yarn
+```
+
+Then run `yarn run build` if it builds, then everything works!
+
+### Setting SSL
+
+To mirror production staging should be done with HTTPS as well, so better load up the certs! (read the full guide [here](https://www.nginx.com/blog/nginx-https-101-ssl-basics-getting-started/#HowdoIgetaCertificate)). TL;DR, we will need the following
+
+* Generate a key-pair
+* Generate a sign request
+* Sign it ourselves
+
+```zsh
+openssl genrsa -des3 -passout pass:x -out server.pass.key 2048
+openssl rsa -passin pass:x -in server.pass.key -out server.key
+rm server.pass.key
+openssl req -new -key server.key -out server.csr
+```
+
+This creates your `key.csr` certificate signing request. Next, we'll need to sign this certificate ourselves, the full guide is from [heroku](https://devcenter.heroku.com/articles/ssl-certificate-self). Self sign with the following:
+
+```zsh
+openssl x509 -req -sha256 -days 365 -in server.csr -signkey server.key -out server.crt
+```
+
+Purely for your convenience, I've committed the development use version of these certs into the public directory, use them *ONLY* for development!
+
+
+### Setting Up Nginx
+
+We use `nginx` as the reverse proxy to emulate github pages. Setup nginx like so:
+
+```zsh
+brew install nginx
+cd /usr/local/etc/nginx
+```
+
+Once installed, go inside your installed `nginx` directory and edit the `nginx.conf` file so that you can add servers:
+
+```zsh
+sudo vim nginx.conf
+```
+
+Toward the bottom of the file, you'll see something like:
+
+```
+    #        root   html;
+    #        index  index.html index.htm;
+    #    }
+    #}
+    include servers/*;
+}
+```
+
+Right below the `include servers/*` line, add the following:
+
+```
+include [PATH-TO-YOUR-LOCAL-PROJECTS-DIRECTORY];
+```
+
+On my mac, this looks like:
+
+```
+include servers/*;
+include /Users/conformity/Projects/servers/*.nginx.conf;
+```
+
+For serving this particular project, I hate the following file at
+`/Users/conformity/Projects/servers/team2gather.nginx.conf`
+
+```
+server {
+    listen       443 ssl;
+    server_name  team2gather.local-github.xxx;
+
+    ssl_certificate /Users/conformity/Projects/biz/team2gather/hate/public/development.crt;
+    ssl_certificate_key /Users/conformity/Projects/biz/team2gather/hate/public/development.key;
+    ssl_session_timeout 1d;
+
+    location /hate {
+        alias   /Users/conformity/Projects/biz/team2gather/hate/build;
+        index  index.html index.htm;
+    }
+}
+```
+
+*note* When you make changes to your nginx configurations, be sure to run:
+
+```zsh
+sudo nginx -s reload
+```
+To reload the configurations. Alternatively, if you've just restarted your machine or your nginx demon is turned off for some reason, be sure to turn it on with:
+
+```zsh
+sudo nginx
+```
+
+### Configre your Etsy Hostss
+
+You'll notice that my nginx conf states I have a `server_name` of `local-github.xxx`. But if you type that address into your address bar, you'll get nowhere! What's going on?
+
+The trick is you have to configure your `/etc/hosts` file to let your computer know that it shouldn't look to the public DNS for the IP address of your hostname. Edit your host file like so:
+
+```
+sudo vim /etc/hosts
+```
+
+Then edit that file so that it looks something like:
+
+```
+##
+# Host Database
+#
+# localhost is used to configure the loopback interface
+# when the system is booting.  Do not change this entry.
+##
+127.0.0.1	localhost
+255.255.255.255	broadcasthost
+::1             localhost
+127.0.0.1       local-github.xxx
+```
+
+In particular, the last line `127.0.0.1       local-github.xxx` indicates that the url `local-github.xxx` points to your home address!
+
 This project was bootstrapped with [Create React App](https://github.com/facebookincubator/create-react-app).
 
 Below you will find some information on how to perform common tasks.<br>
 You can find the most recent version of this guide [here](https://github.com/facebookincubator/create-react-app/blob/master/packages/react-scripts/template/README.md).
+
+### Opening Chrome With Unsafe Service Workers
+
+So you've managed to successfully setup all the above and ran `yarn run build` to a completed build, it's time to finally test.
+
+Open up your chrome with the following command line (to tell chrome to ignore SSL certificate errros):
+
+```zsh
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --user-data-dir=/tmp/foo --ignore-certificate-errors --unsafely-treat-insecure-origin-as-secure=https://team2gather.local-github.xxx
+```
+
+See the full guide about disabling chrome [security here](https://deanhume.com/testing-service-workers-locally-with-self-signed-certificates/), then visit https://team2gather.local-github.xxx/hate
 
 ## Table of Contents
 

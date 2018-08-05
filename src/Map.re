@@ -1,3 +1,5 @@
+open BsFirestore;
+
 [@bs.val][@bs.scope ("document")] external getElementById : string => Dom.element = "";
 [@bs.val][@bs.scope ("geolocation")] external clearWatch : int => unit = "";
 [@bs.val][@bs.scope ("navigator", "geolocation")] external watchPosition : ('a, 'b) => int = "";
