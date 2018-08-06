@@ -48,6 +48,10 @@ let make = (_children) => {
   initialState: () => {
     route: ReasonReact.Router.dangerouslyGetInitialUrl().hash |> mapHashToRoute
   },
+  /**
+   * TODO: as per https://github.com/reasonml/reason-react/issues/173#issuecomment-388152222
+   * we must switch to using `onMount` since this will be removed
+   */
   subscriptions: self => [
     Sub(
       () =>
