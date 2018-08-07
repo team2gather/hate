@@ -7,6 +7,7 @@ open BsFirestore;
 type markerData = {
     slackId: string,
     slackName: string,
+    slackRealName: string,
     slackImageUrl: string,
     slackColor: string,
     coordinates: (float, float),
@@ -60,6 +61,7 @@ let mapMarkersListener = (self, mapId, markerId, db) => {
         let marker = {
             slackId: docData##id,
             slackName: docData##name,
+            slackRealName: docData##realName,
             slackImageUrl: docData##imageUrl,
             slackColor: docData##color,
             coordinates: (docData##coordinates##latitude, docData##coordinates##longitude),
@@ -126,6 +128,12 @@ let make = (~mapId, ~markerId, ~db, _children) => {
         switch(action) {
             | CreateMap => {
                 state.map := Some(GoogleMap.instance(getElementById("map")));
+                let markerOverlay = GoogleMap.OverlayView.instance();
+                markerOverlay##draw #= (() => {
+                    let panes = GoogleMap.OverlayView.getPanes(markerOverlay);
+                    panes##markerLayer##id #= "markerLayer";
+                });
+                GoogleMap.OverlayView.setMap(markerOverlay, state.map^);
                 ReasonReact.NoUpdate;
             }
             | UpdateMapInfo(newState) => {
@@ -134,7 +142,7 @@ let make = (~mapId, ~markerId, ~db, _children) => {
                         | Some(map) => {
                             GoogleMap.Marker.setOptions(self.state.meetupMarker^, {
                                 "position" : GoogleMap.LatLng.instance(fst(self.state.meetupLocationCoordinates), snd(self.state.meetupLocationCoordinates)),
-                                "map" : self.state.map^,
+                                "map" : self.state.map^
                             });
                             adjustMapBounds(map, self.state.meetupMarker^, self.state.markers^);
                         }
@@ -153,11 +161,24 @@ let make = (~mapId, ~markerId, ~db, _children) => {
                                 });
                             }
                             | None => {
-                                Js.Dict.set(self.state.markers^, mData.slackId, GoogleMap.Marker.instance({
-                                    "label": mData.slackName,
+                                let realName = Js.String.split(" ", mData.slackRealName);
+                                let shortRealName = Array.fold_left((accum, curr) => {
+                                    Js.String.concat(Js.String.get(curr, 0), accum);
+                                }, "", realName);
+
+                                let newMarker = GoogleMap.Marker.instance({
+                                    "label": {
+                                        "text": shortRealName,
+                                        "fontSize" : "12px"
+                                    },
+                                    "icon": { 
+                                        "url" : mData.slackImageUrl,
+                                        "labelOrigin": GoogleMap.Point.instance(12, -5),
+                                    },
                                     "position" : GoogleMap.LatLng.instance(fst(mData.coordinates), snd(mData.coordinates)),
                                     "map" : self.state.map^
-                                }));
+                                });
+                                Js.Dict.set(self.state.markers^, mData.slackId, newMarker);
                             }
                         };
                         switch self.state.map^ {
