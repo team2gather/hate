@@ -1,13 +1,4 @@
-open BsFirestore;
-
 [%bs.raw {|require('./App.css')|}];
-
-let config = [%bs.raw {|require('./firebase-config.json')|}];
-let firebase = Firebase.initializeApp(config);
-let firestore = Firebase.firestore(firebase); 
-Firestore.settings(firestore, [%bs.obj {
-  timestampsInSnapshots: true
-}]);
 
 type route = 
   | RouteHome
@@ -42,7 +33,7 @@ let mapHashToRoute = (hash: string) => {
 
 let component = ReasonReact.reducerComponent("App");
 
-let make = (_children) => {
+let make = (~dataAccessor, children) => {
   ...component,
   reducer,
   initialState: () => {
@@ -64,7 +55,7 @@ let make = (_children) => {
   render: self => {
     switch (self.state.route) {
       | RouteMap(mapId, markerId) => {
-        <Map mapId markerId db=firestore/>
+        <Map mapId markerId dataAccessor=dataAccessor/>
       }
       | RouteHome => <Home/>
     }

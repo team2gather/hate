@@ -33,8 +33,8 @@ type action =
 
 let component = ReasonReact.reducerComponent("Map");
 
-let mapInfoListener = (self, mapId, db) => {
-    Firestore.collection(db, "maps")
+let mapInfoListener = (self, mapId, dataAccessor) => {
+    Firestore.collection(dataAccessor, "maps")
     |. Firestore.doc(mapId)
     |. Firestore.DocumentReference.onSnapshot((snapshot) => {
     let data = Firestore.DocumentSnapshot.data(snapshot);
@@ -50,8 +50,8 @@ let mapInfoListener = (self, mapId, db) => {
     });
 };
 
-let mapMarkersListener = (self, mapId, markerId, db) => {
-    Firestore.collection(db, "maps")
+let mapMarkersListener = (self, mapId, markerId, dataAccessor) => {
+    Firestore.collection(dataAccessor, "maps")
     |. Firestore.doc(mapId)
     |. Firestore.collection("attendees")
     |. Firestore.CollectionReference.onSnapshot((snapshot) => {
@@ -85,7 +85,7 @@ let adjustMapBounds = (map, meetupMarker, peopleMarkers) => {
     GoogleMap.panToBounds(map, bounds);
 }
 
-let make = (~mapId, ~markerId, ~db, _children) => {
+let make = (~mapId:string, ~markerId:string, ~dataAccessor, _children) => {
     ...component,
     initialState: () => {
         map: ref(None),
@@ -103,7 +103,7 @@ let make = (~mapId, ~markerId, ~db, _children) => {
 
         /* GEOLOCATION LISTENER */
         let unregisterWatchPosition = watchPosition(pos => {
-            Firestore.collection(db, "maps")
+            Firestore.collection(dataAccessor, "maps")
             |. Firestore.doc(mapId)
             |. Firestore.collection("attendees")
             |. Firestore.doc(markerId)
@@ -115,8 +115,8 @@ let make = (~mapId, ~markerId, ~db, _children) => {
         });
 
         /* DB LISTENERS */
-        let mapInfoUnsubscribe = mapInfoListener(self, mapId, db);
-        let mapMarkersUnsubscribe = mapMarkersListener(self, mapId, markerId, db);
+        let mapInfoUnsubscribe = mapInfoListener(self, mapId, dataAccessor);
+        let mapMarkersUnsubscribe = mapMarkersListener(self, mapId, markerId, dataAccessor);
         
         self.onUnmount(() => {
             clearWatch(unregisterWatchPosition);
