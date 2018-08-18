@@ -22,3 +22,14 @@ let reducer = (action, _state) =>
   | ChangeRoute(route) => ReasonReact.Update({route: route})
   };
   
+let component = ReasonReact.reducerComponent("Example");
+
+let make = (_children) => {
+  ...component,
+  reducer,
+  render: self => {
+    <>
+      TODO: Put content here
+    </>
+  }
+}
