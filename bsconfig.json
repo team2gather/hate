@@ -4,7 +4,7 @@
   "bs-dependencies": [
     "reason-react",
     "@glennsl/bs-jest",
-    "bs-firestore"
+    "bs-firebase"
   ],
   "reason": {
     "react-jsx": 2
