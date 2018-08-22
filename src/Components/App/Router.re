@@ -21,15 +21,23 @@ let reducer = (action, _state) =>
   switch action {
   | ChangeRoute(route) => ReasonReact.Update({route: route})
   };
-  
+
+let urlToAction = (url) => url.hash |> Js.String.split("/") |> mapHashToRoute |> ChangeRoute;
+
 let component = ReasonReact.reducerComponent("Example");
 
-let make = (_children) => {
+let make = (children) => {
   ...component,
   reducer,
+  didMount: self => {
+    let watcherID = ReasonReact.Router.watchUrl(url => {
+      url |> urlToAction |> self.send
+    });
+    self.onUnmount(() => ReasonReact.Router.unwatchUrl(watcherID));
+  },
   render: self => {
     <>
-      TODO: Put content here
+      children(self)
     </>
   }
 }
