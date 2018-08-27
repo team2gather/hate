@@ -1,33 +1,35 @@
 [%bs.raw {|require('./App.css')|}];
 
-let component = ReasonReact.reducerComponent("App");
+let component = ReasonReact.statelessComponent("App");
 
-let make = (_children) => {
+let render = (self) =>
+  <>
+    {renderCore(self)}
+    {
+      if (self.props.isDevMode) {
+        renderDebug(self)
+      }
+    }
+  </>
+;
+
+let renderCore = (self) => 
+  <main>
+    <Router />
+  </main>
+;
+
+let renderDebug = (self) => 
+  <section className="debug">
+    Debug Controls go here
+  </section>
+;
+
+let make = (~isDevMode = true, _children) => {
   ...component,
   reducer,
-  initialState: () => {
-    route: ReasonReact.Router.dangerouslyGetInitialUrl().hash |> mapHashToRoute
-  },
-  /**
-   * TODO: as per https://github.com/reasonml/reason-react/issues/173#issuecomment-388152222
-   * we must switch to using `onMount` since this will be removed
-   */
-  subscriptions: self => [
-    Sub(
-      () =>
-        ReasonReact.Router.watchUrl(url => {
-          self.send(ChangeRoute(url.hash |> mapHashToRoute))
-        }),
-      ReasonReact.Router.unwatchUrl,
-    ),
-  ],
-  render: self => {
-    switch (self.state.route) {
-      | RouteMap(mapId, markerId) => {
-        <Map mapId markerId db=firestore/>
-      }
-      | RouteHome => <Home/>
-    }
-  }
+  initialState,
+  didMount,
+  render
 };
 
