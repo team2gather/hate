@@ -5,7 +5,7 @@ open BsFirestore;
 [@bs.val][@bs.scope ("navigator", "geolocation")] external watchPosition : ('a, 'b) => int = "";
 
 type markerData = {
-    slackId: string,
+      slackId: string,
     slackName: string,
     slackRealName: string,
     slackImageUrl: string,
@@ -31,7 +31,7 @@ type action =
 | UpdateMapMarkers(array(markerData))
 ;
 
-let component = ReasonReact.reducerComponent("Map");
+let component = ReasonReact.reducerComponent("AppMapRoute");
 
 let mapInfoListener = (self, mapId, db) => {
     Firestore.collection(db, "maps")

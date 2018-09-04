@@ -1,4 +1,4 @@
-let component = ReasonReact.statelessComponent("Home");
+let component = ReasonReact.statelessComponent("AppHomeRoute");
 
 let make = (_children) => {
   ...component,

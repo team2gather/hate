@@ -6,3 +6,13 @@ let firestore = Firebase.firestore(firebase);
 Firestore.settings(firestore, [%bs.obj {
   timestampsInSnapshots: true
 }]);
+
+type state = {
+  firestore: Firebase.t
+};
+
+let didMount = () => {
+  
+}
+
+let component = ReasonReact.statelessComponent
