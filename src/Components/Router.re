@@ -5,7 +5,6 @@ let initialState = () => {
   route: RouteHome
 };
 
-
 let reducer = (action, _state) =>
   switch action {
     | ChangeRoute(route) => ReasonReact.Update({route: route})
